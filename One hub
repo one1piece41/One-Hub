@@ -1,0 +1,312 @@
+
+-- ONE HUB MICRO | Mobile | No BUY EGG
+
+local Players = game:GetService("Players")
+local UIS = game:GetService("UserInputService")
+local player = Players.LocalPlayer
+local playerGui = player:WaitForChild("PlayerGui")
+
+local old = playerGui:FindFirstChild("ONE_HUB")
+if old then old:Destroy() end
+
+local RED = Color3.fromRGB(255,35,55)
+local DARK = Color3.fromRGB(20,12,15)
+local PANEL = Color3.fromRGB(42,20,25)
+local WHITE = Color3.new(1,1,1)
+
+local savedCFrame
+local teleEnabled, espEnabled = false, false
+local espObjects = {}
+
+local function round(obj, radius)
+    local c = Instance.new("UICorner")
+    c.CornerRadius = UDim.new(0,radius)
+    c.Parent = obj
+end
+
+local function outline(obj)
+    local s = Instance.new("UIStroke")
+    s.Color = RED
+    s.Thickness = 1
+    s.Parent = obj
+end
+
+local gui = Instance.new("ScreenGui")
+gui.Name = "ONE_HUB"
+gui.ResetOnSpawn = false
+gui.IgnoreGuiInset = true
+gui.DisplayOrder = 999
+gui.Parent = playerGui
+
+local toggle = Instance.new("TextButton")
+toggle.Size = UDim2.fromOffset(36,26)
+toggle.Position = UDim2.new(0,6,0.35,0)
+toggle.BackgroundColor3 = DARK
+toggle.Text = "HUB"
+toggle.TextColor3 = RED
+toggle.TextSize = 10
+toggle.Font = Enum.Font.GothamBold
+toggle.Active = true
+toggle.Parent = gui
+round(toggle,7)
+outline(toggle)
+
+local frame = Instance.new("Frame")
+frame.Size = UDim2.fromOffset(145,137)
+frame.Position = UDim2.new(0,48,0.25,0)
+frame.BackgroundColor3 = DARK
+frame.BorderSizePixel = 0
+frame.Parent = gui
+round(frame,8)
+outline(frame)
+
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(1,-48,0,23)
+title.Position = UDim2.fromOffset(6,1)
+title.BackgroundTransparency = 1
+title.Text = "ONE HUB"
+title.TextColor3 = RED
+title.TextSize = 11
+title.Font = Enum.Font.GothamBold
+title.TextXAlignment = Enum.TextXAlignment.Left
+title.Active = true
+title.Parent = frame
+
+local function headerButton(txt,x)
+    local b = Instance.new("TextButton")
+    b.Size = UDim2.fromOffset(18,18)
+    b.Position = UDim2.new(1,x,0,3)
+    b.BackgroundColor3 = PANEL
+    b.Text = txt
+    b.TextColor3 = WHITE
+    b.TextSize = 10
+    b.Font = Enum.Font.GothamBold
+    b.Parent = frame
+    round(b,4)
+    return b
+end
+
+local minimize = headerButton("-",-41)
+local close = headerButton("X",-21)
+
+local status = Instance.new("TextLabel")
+status.Size = UDim2.new(1,-10,0,15)
+status.Position = UDim2.fromOffset(5,24)
+status.BackgroundTransparency = 1
+status.Text = "Ready"
+status.TextColor3 = Color3.fromRGB(230,190,195)
+status.TextSize = 8
+status.Font = Enum.Font.Gotham
+status.Parent = frame
+
+local content = Instance.new("Frame")
+content.Size = UDim2.new(1,-10,0,78)
+content.Position = UDim2.fromOffset(5,41)
+content.BackgroundTransparency = 1
+content.Parent = frame
+
+local layout = Instance.new("UIListLayout")
+layout.Padding = UDim.new(0,3)
+layout.Parent = content
+
+local function makeButton(txt,order)
+    local b = Instance.new("TextButton")
+    b.Size = UDim2.new(1,0,0,23)
+    b.BackgroundColor3 = PANEL
+    b.Text = txt
+    b.TextColor3 = WHITE
+    b.TextSize = 8
+    b.Font = Enum.Font.GothamBold
+    b.LayoutOrder = order
+    b.Parent = content
+    round(b,5)
+    outline(b)
+    return b
+end
+
+local setBtn = makeButton("SET SPOT",1)
+local teleBtn = makeButton("TELE: OFF",2)
+local espBtn = makeButton("ESP: OFF",3)
+
+local function draggable(target,handle)
+    local dragging = false
+    local startInput, startPosition
+
+    handle.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.Touch
+        or input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = true
+            startInput = input.Position
+            startPosition = target.Position
+        end
+    end)
+
+    UIS.InputChanged:Connect(function(input)
+        if dragging and (
+            input.UserInputType == Enum.UserInputType.Touch
+            or input.UserInputType == Enum.UserInputType.MouseMovement
+        ) then
+            local delta = input.Position - startInput
+            target.Position = UDim2.new(
+                startPosition.X.Scale,
+                startPosition.X.Offset + delta.X,
+                startPosition.Y.Scale,
+                startPosition.Y.Offset + delta.Y
+            )
+        end
+    end)
+
+    UIS.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.Touch
+        or input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = false
+        end
+    end)
+end
+
+draggable(toggle,toggle)
+draggable(frame,title)
+
+toggle.Activated:Connect(function()
+    frame.Visible = not frame.Visible
+end)
+
+local minimized = false
+minimize.Activated:Connect(function()
+    minimized = not minimized
+    content.Visible = not minimized
+    status.Visible = not minimized
+    frame.Size = minimized
+        and UDim2.fromOffset(145,27)
+        or UDim2.fromOffset(145,137)
+    minimize.Text = minimized and "+" or "-"
+end)
+
+local function removeESP(plr)
+    local items = espObjects[plr]
+    if not items then return end
+    for _,obj in ipairs(items) do
+        pcall(function() obj:Destroy() end)
+    end
+    espObjects[plr] = nil
+end
+
+close.Activated:Connect(function()
+    teleEnabled = false
+    espEnabled = false
+    for plr in pairs(espObjects) do
+        removeESP(plr)
+    end
+    gui:Destroy()
+end)
+
+-- SET SPOT
+setBtn.Activated:Connect(function()
+    local char = player.Character
+    local root = char and char:FindFirstChild("HumanoidRootPart")
+    if root then
+        savedCFrame = root.CFrame
+        status.Text = "Spot saved!"
+    else
+        status.Text = "Character not ready"
+    end
+end)
+
+-- TELE ON/OFF
+teleBtn.Activated:Connect(function()
+    if not savedCFrame then
+        status.Text = "Set spot first"
+        return
+    end
+
+    teleEnabled = not teleEnabled
+    teleBtn.Text = teleEnabled and "TELE: ON" or "TELE: OFF"
+    status.Text = teleEnabled and "Tele ON" or "Tele OFF"
+
+    if teleEnabled then
+        task.spawn(function()
+            while teleEnabled and gui.Parent do
+                local char = player.Character
+                local root = char and char:FindFirstChild("HumanoidRootPart")
+                if root and savedCFrame then
+                    pcall(function()
+                        root.CFrame = savedCFrame
+                    end)
+                end
+                task.wait(0.3)
+            end
+        end)
+    end
+end)
+
+-- ESP
+local function addESP(plr)
+    if plr == player or not espEnabled then return end
+    removeESP(plr)
+
+    local char = plr.Character
+    if not char then return end
+
+    local highlight = Instance.new("Highlight")
+    highlight.Adornee = char
+    highlight.FillColor = RED
+    highlight.OutlineColor = WHITE
+    highlight.FillTransparency = 0.65
+    highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+    highlight.Parent = gui
+
+    local items = {highlight}
+    local head = char:FindFirstChild("Head")
+
+    if head then
+        local bill = Instance.new("BillboardGui")
+        bill.Adornee = head
+        bill.Size = UDim2.fromOffset(120,20)
+        bill.StudsOffset = Vector3.new(0,2.5,0)
+        bill.AlwaysOnTop = true
+        bill.Parent = gui
+
+        local label = Instance.new("TextLabel")
+        label.Size = UDim2.fromScale(1,1)
+        label.BackgroundTransparency = 1
+        label.Text = plr.Name
+        label.TextColor3 = WHITE
+        label.TextStrokeTransparency = 0
+        label.TextSize = 10
+        label.Font = Enum.Font.GothamBold
+        label.Parent = bill
+        table.insert(items,bill)
+    end
+
+    espObjects[plr] = items
+end
+
+espBtn.Activated:Connect(function()
+    espEnabled = not espEnabled
+    espBtn.Text = espEnabled and "ESP: ON" or "ESP: OFF"
+
+    if espEnabled then
+        for _,plr in ipairs(Players:GetPlayers()) do
+            addESP(plr)
+        end
+        status.Text = "ESP ON"
+    else
+        for plr in pairs(espObjects) do
+            removeESP(plr)
+        end
+        status.Text = "ESP OFF"
+    end
+end)
+
+Players.PlayerAdded:Connect(function(plr)
+    plr.CharacterAdded:Connect(function()
+        task.wait(1)
+        if espEnabled and gui.Parent then
+            addESP(plr)
+        end
+    end)
+end)
+
+Players.PlayerRemoving:Connect(removeESP)
+
+print("ONE HUB MICRO loaded")
